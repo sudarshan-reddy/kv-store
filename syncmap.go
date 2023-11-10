@@ -2,6 +2,7 @@ package kv
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
 
@@ -19,10 +20,19 @@ func newNotFoundError(key string) *notFoundError {
 	}
 }
 
+type kvFullError struct{}
+
+func (e *kvFullError) Error() string {
+	return "kv store is full"
+}
+
+var ErrKVFull = &kvFullError{}
+
 type WriteOptimizedMap struct {
 	m  sync.RWMutex
 	db map[string]interface{}
 
+	size int
 	// batched update settings
 	// batchedWritesCheckInterval controls how often we check to see if the context is cancelled for
 	// batch writes.
@@ -30,11 +40,12 @@ type WriteOptimizedMap struct {
 	rollback                   bool
 }
 
-func NewWriteOptimizedMapStore(batchedWritesCheckInterval int, rollback bool) *WriteOptimizedMap {
+func NewWriteOptimizedMapStore(batchedWritesCheckInterval int, rollback bool, cacheSize int) *WriteOptimizedMap {
 	return &WriteOptimizedMap{
 		db:                         make(map[string]interface{}),
 		rollback:                   rollback,
 		batchedWritesCheckInterval: batchedWritesCheckInterval,
+		size:                       cacheSize,
 	}
 }
 
@@ -50,6 +61,9 @@ func (s *WriteOptimizedMap) Get(key string) (interface{}, error) {
 func (s *WriteOptimizedMap) Put(key string, value interface{}) error {
 	s.m.Lock()
 	defer s.m.Unlock()
+	if len(s.db) >= s.size {
+		return ErrKVFull
+	}
 	s.db[key] = value
 	return nil
 }
@@ -126,7 +140,6 @@ func (s *WriteOptimizedMap) BatchUpdate(ctx context.Context, pairs []Pair) ([]Pa
 	return updatedPairs, nil
 }
 
-// TODO
 func (s *WriteOptimizedMap) BatchUpdateAsync(pairs []Pair) error {
-	return nil
+	return errors.New("not implemented: Read docs for why")
 }

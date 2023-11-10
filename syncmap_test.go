@@ -11,7 +11,7 @@ import (
 )
 
 func TestGet(t *testing.T) {
-	inMemoryMap := NewWriteOptimizedMapStore(0, false)
+	inMemoryMap := NewWriteOptimizedMapStore(0, false, 10)
 	var tests = []struct {
 		key   string
 		value string
@@ -37,7 +37,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestConcurrentPuts(t *testing.T) {
-	m := NewWriteOptimizedMapStore(1, false)
+	m := NewWriteOptimizedMapStore(1, false, 1000)
 	m.db = make(map[string]interface{})
 
 	// Use a WaitGroup to wait for all goroutines to finish
@@ -128,7 +128,7 @@ func TestBatchUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
-			m := NewWriteOptimizedMapStore(1, tt.rollbackEnabled)
+			m := NewWriteOptimizedMapStore(1, tt.rollbackEnabled, 1000000)
 			m.db = tt.initialState
 
 			var updatedPairs []Pair
