@@ -19,6 +19,10 @@ type lru struct {
 	size       int
 }
 
+// This is an LRU cache implementation of the KVStore interface.
+// In this implementation, we evict older entries when the cache is full.
+// A good time to use this implementation is as a cache where it is okay
+// to lose data.
 func NewLRUCacheStore(size int) *lru {
 	return &lru{
 		ll:         list.New(),

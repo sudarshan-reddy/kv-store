@@ -162,6 +162,75 @@ func TestBatchUpdate(t *testing.T) {
 	}
 }
 
+func BenchmarkMapCachePut(b *testing.B) {
+	cache := NewWriteOptimizedMapStore(1, false, 1000) // Assuming these are the desired settings
+
+	for i := 0; i < b.N; i++ {
+		key := "key" + strconv.Itoa(i)
+		cache.Put(key, i)
+	}
+}
+
+func BenchmarkMapCacheGet(b *testing.B) {
+	cache := NewWriteOptimizedMapStore(1, false, 1000)
+
+	// Prepopulate the cache
+	for i := 0; i < 1000; i++ {
+		key := "key" + strconv.Itoa(i)
+		cache.Put(key, i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key" + strconv.Itoa(i%1000)
+		cache.Get(key)
+	}
+}
+
+func BenchmarkMapCacheUpdate(b *testing.B) {
+	cache := NewWriteOptimizedMapStore(1, false, 1000)
+
+	// Prepopulate the cache
+	for i := 0; i < 1000; i++ {
+		key := "key" + strconv.Itoa(i)
+		cache.Put(key, i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key" + strconv.Itoa(i%1000)
+		cache.Put(key, i) // Using Put for Update
+	}
+}
+
+func BenchmarkMapCacheBatchUpdateWithRollbackFalse(b *testing.B) {
+	cache := NewWriteOptimizedMapStore(1, false, 1000)
+
+	pairs := make([]Pair, 1000)
+	for i := 0; i < 1000; i++ {
+		pairs[i] = Pair{Key: "key" + strconv.Itoa(i), Value: i}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cache.BatchUpdate(context.Background(), pairs)
+	}
+}
+
+func BenchmarkMapCacheBatchUpdateWithRollbackTrue(b *testing.B) {
+	cache := NewWriteOptimizedMapStore(1, true, 1000)
+
+	pairs := make([]Pair, 1000)
+	for i := 0; i < 1000; i++ {
+		pairs[i] = Pair{Key: "key" + strconv.Itoa(i), Value: i}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cache.BatchUpdate(context.Background(), pairs)
+	}
+}
+
 func aLotOfPairs(n int) []Pair {
 	pairs := make([]Pair, 0)
 	for i := 0; i < n; i++ {

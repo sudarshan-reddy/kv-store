@@ -3,6 +3,7 @@ package kv
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 )
@@ -73,5 +74,64 @@ func TestLRUCache_BatchUpdate(t *testing.T) {
 		if value != pair.Value {
 			t.Fatalf("BatchUpdate did not update the pair correctly")
 		}
+	}
+}
+
+func BenchmarkLRUCachePut(b *testing.B) {
+	cacheSize := 1000
+	cache := NewLRUCacheStore(cacheSize)
+
+	for i := 0; i < b.N; i++ {
+		key := "key" + strconv.Itoa(i%cacheSize)
+		cache.Put(key, i)
+	}
+}
+
+func BenchmarkLRUCacheGet(b *testing.B) {
+	cacheSize := 1000
+	cache := NewLRUCacheStore(1000)
+
+	// Prepopulate the cache
+	for i := 0; i < cacheSize; i++ {
+		key := "key" + strconv.Itoa(i)
+		cache.Put(key, i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key" + strconv.Itoa(i%cacheSize)
+		cache.Get(key)
+	}
+}
+
+func BenchmarkLRUCacheUpdate(b *testing.B) {
+	cacheSize := 1000
+	cache := NewLRUCacheStore(cacheSize)
+
+	// Prepopulate the cache
+	for i := 0; i < cacheSize; i++ {
+		key := "key" + strconv.Itoa(i)
+		cache.Put(key, i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key" + strconv.Itoa(i%cacheSize)
+		cache.Put(key, i) // Using Put for Update as LRU cache does not differentiate
+	}
+}
+
+func BenchmarkLRUCacheBatchUpdate(b *testing.B) {
+	cacheSize := 1000
+	cache := NewLRUCacheStore(cacheSize)
+
+	pairs := make([]Pair, cacheSize)
+	for i := 0; i < cacheSize; i++ {
+		pairs[i] = Pair{Key: "key" + strconv.Itoa(i), Value: i}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cache.BatchUpdate(context.Background(), pairs)
 	}
 }

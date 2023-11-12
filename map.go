@@ -28,7 +28,21 @@ func (e *kvFullError) Error() string {
 
 var ErrKVFull = &kvFullError{}
 
+// This map prefers a map locked with mutexes over a sync.Map because the sync.Map is
+// optimized for when the entry for a given key is only ever written once but read many times,
+// as in caches that only grow, or (2) when multiple goroutines read, write, and overwrite entries
+// for disjoint sets of keys.
+// TODO: I could perhaps optimize this by having a Sync.Map and use multiple goroutines to
+// write for a disjoint set of keys avoiding both mutex contention and taking full advantage of a sync.Map
 type WriteOptimizedMap struct {
+	// Mutexes galore: I chose mutexes over channels because the complexity of channels
+	// that would add to this demonstration is not worth the performance benefits at this moment.
+	// In my opinion, the overhead of channel communication and and context switching between
+	// goroutines might offset the benefits of removing mutexes, especially in a scenario where
+	// the cache operations are not particularly contention-heavy.
+	// Maybe there is value in re-writing this with a worker/actor based model in a system where
+	// we write very very often (like this "WriteOptimizedMap" and  see a lot of contention on mutexes.
+	// But I would prefer to benchmark and compare to make that optimization if needed.
 	m  sync.RWMutex
 	db map[string]interface{}
 
@@ -40,6 +54,7 @@ type WriteOptimizedMap struct {
 	rollback                   bool
 }
 
+// NewWriteOptimizedMapStore returns a new WriteOptimizedMapStore
 func NewWriteOptimizedMapStore(batchedWritesCheckInterval int, rollback bool, cacheSize int) *WriteOptimizedMap {
 	return &WriteOptimizedMap{
 		db:                         make(map[string]interface{}),
