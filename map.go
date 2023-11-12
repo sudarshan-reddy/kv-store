@@ -2,7 +2,6 @@ package kv
 
 import (
 	"context"
-	"errors"
 	"sync"
 )
 
@@ -153,8 +152,4 @@ func (s *WriteOptimizedMap) BatchUpdate(ctx context.Context, pairs []Pair) ([]Pa
 	}
 
 	return updatedPairs, nil
-}
-
-func (s *WriteOptimizedMap) BatchUpdateAsync(pairs []Pair) error {
-	return errors.New("not implemented: Read docs for why")
 }

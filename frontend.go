@@ -19,7 +19,7 @@ func NewHTTPServer(store Store, addr string) *Server {
 	server := &Server{db: store, addr: addr, mux: mux}
 	mux.HandleFunc("/set", server.setHandler)
 	mux.HandleFunc("/get", server.getHandler)
-	mux.HandleFunc("/setBulk", server.setBulkHandler)
+	mux.HandleFunc("/updateBulk", server.updateBulkHandler)
 	mux.HandleFunc("/delete", server.deleteHandler)
 	return server
 }
@@ -31,11 +31,6 @@ func (s *Server) Start() error {
 }
 
 type Response struct {
-	Value interface{} `json:"value"`
-}
-
-type SetBody struct {
-	Key   string      `json:"key"`
 	Value interface{} `json:"value"`
 }
 
@@ -58,7 +53,7 @@ func (s *Server) setHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var kv SetBody
+	var kv Pair
 	err := json.NewDecoder(r.Body).Decode(&kv)
 	r.Body.Close()
 	if err != nil {
@@ -74,12 +69,40 @@ func (s *Server) setHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+func (s *Server) updateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var kv Pair
+
+	err := json.NewDecoder(r.Body).Decode(&kv)
+	r.Body.Close()
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.db.Update(kv.Key, kv.Value); err != nil {
+		if err, ok := err.(*notFoundError); ok && err != nil {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+}
+
 // TODO: This whole thing is memory/allocation intensive. I tend to keep the
 // body in memory and later do the same inside the data store with storing the
 // rollback information and what not.
 // Maybe I should think of a streaming solution here eventually.
-func (s *Server) setBulkHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+func (s *Server) updateBulkHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -101,8 +124,16 @@ func (s *Server) setBulkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := Response{Value: updatedKeys}
 	w.Header().Set("Content-Type", "application/json")
+
+	if len(updatedKeys) != len(kvs) {
+		http.Error(w, "Partial update", http.StatusPartialContent)
+		return
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	resp := Response{Value: updatedKeys}
 	json.NewEncoder(w).Encode(resp)
 }
 

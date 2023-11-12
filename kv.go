@@ -11,8 +11,8 @@ type Pair struct {
 // Store represents the operations that any KV store has to implement
 type Store interface {
 	Get(key string) (interface{}, error)
-	// Notes: An Update is also a Put
 	Put(key string, value interface{}) error
+	Update(key string, value interface{}) error
 	Delete(key string) error
 	// BatchUpdate updates the keys that exist and ignores the ones that dont.
 	BatchUpdate(ctx context.Context, pairs []Pair) (updatedPairs []Pair, err error)
@@ -23,5 +23,5 @@ type Store interface {
 	// Further more, this also introduces a lot of issues with Set and Get values being raced by scheduled jobs.
 	// Doing this would make this system hard to reason with. This function simply exists to document this
 	// thought process.
-	BatchUpdateAsync(pairs []Pair) error
+	// BatchUpdateAsync(pairs []Pair) error
 }

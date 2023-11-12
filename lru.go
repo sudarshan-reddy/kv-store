@@ -3,7 +3,6 @@ package kv
 import (
 	"container/list"
 	"context"
-	"errors"
 	"sync"
 )
 
@@ -74,6 +73,19 @@ func (l *lru) Delete(key string) error {
 	return nil
 }
 
+func (l *lru) Update(key string, value interface{}) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	elem, ok := l.elementMap[key]
+	if !ok {
+		return newNotFoundError(key)
+	}
+	elem.Value.(*entry).value = value
+	l.ll.MoveToFront(elem)
+	return nil
+}
+
 func (l *lru) BatchUpdate(ctx context.Context, pairs []Pair) ([]Pair, error) {
 	updatedPairs := make([]Pair, 0)
 
@@ -82,7 +94,10 @@ func (l *lru) BatchUpdate(ctx context.Context, pairs []Pair) ([]Pair, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			if err := l.Put(pair.Key, pair.Value); err != nil {
+			if err := l.Update(pair.Key, pair.Value); err != nil {
+				if err, ok := err.(*notFoundError); ok && err != nil {
+					continue
+				}
 				return nil, err
 			}
 			updatedPairs = append(updatedPairs, pair)
@@ -99,8 +114,4 @@ func (l *lru) evictLRU() {
 	}
 	l.ll.Remove(elem)
 	delete(l.elementMap, elem.Value.(*entry).key)
-}
-
-func (l *lru) BatchUpdateAsync(pairs []Pair) error {
-	return errors.New("not implemented: See interface docs for why")
 }
